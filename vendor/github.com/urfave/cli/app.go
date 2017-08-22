@@ -85,6 +85,12 @@ type App struct {
 	ErrWriter io.Writer
 	// Other custom info
 	Metadata map[string]interface{}
+	// Carries a function which returns app specific info.
+	ExtraInfo func() map[string]string
+	// CustomAppHelpTemplate the text template for app help topic.
+	// cli.go uses text/template to render templates. You can
+	// render custom help text by setting this variable.
+	CustomAppHelpTemplate string
 
 	didSetup bool
 }
@@ -145,10 +151,6 @@ func (a *App) Setup() {
 		}
 	}
 
-	if a.EnableBashCompletion {
-		a.appendFlag(BashCompletionFlag)
-	}
-
 	if !a.HideVersion {
 		a.appendFlag(VersionFlag)
 	}
@@ -173,6 +175,14 @@ func (a *App) Setup() {
 func (a *App) Run(arguments []string) (err error) {
 	a.Setup()
 
+	// handle the completion flag separately from the flagset since
+	// completion could be attempted after a flag, but before its value was put
+	// on the command line. this causes the flagset to interpret the completion
+	// flag name as the value of the flag before it which is undesirable
+	// note that we can only do this because the shell autocomplete function
+	// always appends the completion flag at the end of the command
+	shellComplete, arguments := checkShellCompleteFlag(a, arguments)
+
 	// parse flags
 	set, err := flagSet(a.Name, a.Flags)
 	if err != nil {
@@ -188,6 +198,7 @@ func (a *App) Run(arguments []string) (err error) {
 		ShowAppHelp(context)
 		return nerr
 	}
+	context.shellComplete = shellComplete
 
 	if checkCompletions(context) {
 		return nil
@@ -229,7 +240,6 @@ func (a *App) Run(arguments []string) (err error) {
 	if a.Before != nil {
 		beforeErr := a.Before(context)
 		if beforeErr != nil {
-			fmt.Fprintf(a.Writer, "%v\n\n", beforeErr)
 			ShowAppHelp(context)
 			HandleExitCoder(beforeErr)
 			err = beforeErr
@@ -290,11 +300,6 @@ func (a *App) RunAsSubcommand(ctx *Context) (err error) {
 		newCmds = append(newCmds, c)
 	}
 	a.Commands = newCmds
-
-	// append flags
-	if a.EnableBashCompletion {
-		a.appendFlag(BashCompletionFlag)
-	}
 
 	// parse flags
 	set, err := flagSet(a.Name, a.Flags)
@@ -479,7 +484,9 @@ func (a Author) String() string {
 // it's an ActionFunc or a func with the legacy signature for Action, the func
 // is run!
 func HandleAction(action interface{}, context *Context) (err error) {
-	if a, ok := action.(func(*Context) error); ok {
+	if a, ok := action.(ActionFunc); ok {
+		return a(context)
+	} else if a, ok := action.(func(*Context) error); ok {
 		return a(context)
 	} else if a, ok := action.(func(*Context)); ok { // deprecated function signature
 		a(context)
