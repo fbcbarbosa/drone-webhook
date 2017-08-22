@@ -11,7 +11,7 @@ import (
 
 	"encoding/json"
 
-	"github.com/Sirupsen/logrus"
+	log "github.com/Sirupsen/logrus"
 	"github.com/drone/drone-go/drone"
 	"github.com/drone/drone-go/template"
 	"github.com/urfave/cli"
@@ -27,7 +27,7 @@ var (
 )
 
 func main() {
-	fmt.Printf("Drone Webhook Plugin built from %s\n", buildCommit)
+	log.Infof("Drone Webhook Plugin built from %s\n", buildCommit)
 
 	app := cli.NewApp()
 	app.Name = "webhook plugin"
@@ -61,14 +61,14 @@ func main() {
 			EnvVar: "PLUGIN_CONTENT_TYPE",
 		},
 		cli.StringFlag{
-			Name:   "auth.username",
-			Usage:  "webhook auth username",
-			EnvVar: "PLUGIN_AUTH_USERNAME",
+			Name:   "headers",
+			Usage:  "webhook content type",
+			EnvVar: "PLUGIN_HEADERS",
 		},
 		cli.StringFlag{
-			Name:   "auth.password",
-			Usage:  "webhook auth password",
-			EnvVar: "PLUGIN_AUTH_PASSWORD",
+			Name:   "auth",
+			Usage:  "webhook auth",
+			EnvVar: "PLUGIN_AUTH",
 		},
 		cli.StringFlag{
 			Name:   "template",
@@ -76,98 +76,118 @@ func main() {
 			EnvVar: "PLUGIN_TEMPLATE",
 		},
 		cli.StringFlag{
-			Name:  "repo.owner",
-			Usage: "repo owner",
+			Name:   "repo.owner",
+			Usage:  "repo owner",
+			EnvVar: "DRONE_REPO_OWNER",
 		},
 		cli.StringFlag{
-			Name:  "repo.name",
-			Usage: "repo name",
+			Name:   "repo.name",
+			Usage:  "repo name",
+			EnvVar: "DRONE_REPO_NAME",
 		},
 		cli.StringFlag{
-			Name:  "repo.link",
-			Usage: "repo link",
+			Name:   "repo.link",
+			Usage:  "repo link",
+			EnvVar: "DRONE_REPO_LINK",
 		},
 		cli.StringFlag{
-			Name:  "repo.avatar",
-			Usage: "repo avatar",
+			Name:   "repo.avatar",
+			Usage:  "repo avatar",
+			EnvVar: "DRONE_REPO_AVATAR",
 		},
 		cli.StringFlag{
-			Name:  "repo.branch",
-			Usage: "repo branch",
+			Name:   "repo.branch",
+			Usage:  "repo branch",
+			EnvVar: "DRONE_REPO_BRANCH",
 		},
 		cli.StringFlag{
-			Name:  "repo.clone",
-			Usage: "repo clone",
+			Name:   "repo.clone",
+			Usage:  "repo clone",
+			EnvVar: "DRONE_REMOTE_URL",
 		},
 		cli.StringFlag{
-			Name:  "commit.sha",
-			Usage: "commit sha",
+			Name:   "commit.sha",
+			Usage:  "commit sha",
+			EnvVar: "DRONE_COMMIT_SHA",
 		},
 		cli.StringFlag{
 			Name:  "commit.ref",
 			Usage: "commit ref",
 		},
 		cli.StringFlag{
-			Name:  "commit.branch",
-			Usage: "commit branch",
+			Name:   "commit.branch",
+			Usage:  "commit branch",
+			EnvVar: "DRONE_COMMIT_REF",
 		},
 		cli.StringFlag{
-			Name:  "commit.link",
-			Usage: "commit link",
+			Name:   "commit.link",
+			Usage:  "commit link",
+			EnvVar: "DRONE_COMMIT_LINK",
 		},
 		cli.StringFlag{
-			Name:  "commit.message",
-			Usage: "commit message",
+			Name:   "commit.message",
+			Usage:  "commit message",
+			EnvVar: "DRONE_COMMIT_MESSAGE",
 		},
 		cli.StringFlag{
-			Name:  "commit.author.name",
-			Usage: "commit author name",
+			Name:   "commit.author.name",
+			Usage:  "commit author name",
+			EnvVar: "DRONE_COMMIT_AUTHOR",
 		},
 		cli.StringFlag{
-			Name:  "commit.author.email",
-			Usage: "commit author email",
+			Name:   "commit.author.email",
+			Usage:  "commit author email",
+			EnvVar: "DRONE_COMMIT_AUTHOR_EMAIL",
 		},
 		cli.StringFlag{
-			Name:  "commit.author.avatar",
-			Usage: "commit author avatar",
+			Name:   "commit.author.avatar",
+			Usage:  "commit author avatar",
+			EnvVar: "DRONE_COMMIT_AUTHOR_AVATAR",
 		},
 		cli.IntFlag{
-			Name:  "build.number",
-			Usage: "build number",
+			Name:   "build.number",
+			Usage:  "build number",
+			EnvVar: "DRONE_BUILD_NUMBER",
 		},
 		cli.StringFlag{
-			Name:  "build.event",
-			Usage: "build event",
+			Name:   "build.event",
+			Usage:  "build event",
+			EnvVar: "DRONE_BUILD_EVENT",
 		},
 		cli.StringFlag{
-			Name:  "build.status",
-			Usage: "build status",
+			Name:   "build.status",
+			Usage:  "build status",
+			EnvVar: "DRONE_BUILD_STATUS",
 		},
 		cli.StringFlag{
-			Name:  "build.link",
-			Usage: "build link",
+			Name:   "build.link",
+			Usage:  "build link",
+			EnvVar: "DRONE_BUILD_LINK",
 		},
 		cli.Int64Flag{
-			Name:  "build.created",
-			Usage: "build created",
+			Name:   "build.created",
+			Usage:  "build created",
+			EnvVar: "DRONE_BUILD_CREATED",
 		},
 		cli.Int64Flag{
-			Name:  "build.started",
-			Usage: "build started",
+			Name:   "build.started",
+			Usage:  "build started",
+			EnvVar: "DRONE_BUILD_STARTED",
 		},
 		cli.Int64Flag{
-			Name:  "build.finished",
-			Usage: "build finished",
+			Name:   "build.finished",
+			Usage:  "build finished",
+			EnvVar: "DRONE_BUILD_FINISHED",
 		},
 	}
 
 	if err := app.Run(os.Args); err != nil {
-		logrus.Fatal(err)
+		log.Fatal(err)
 	}
 }
 
 func run(c *cli.Context) error {
-	logrus.Info(c.Generic("headers"))
+	log.Info(c.Generic("headers"))
 
 	payload := &drone.Payload{
 		Repo: &drone.Repo{
@@ -197,16 +217,29 @@ func run(c *cli.Context) error {
 	}
 
 	vargs := Params{
-		URLs:       c.StringSlice("urls"),
-		SkipVerify: c.Bool("skip_verify"),
-		Debug:      c.Bool("debug"),
-		Auth: Auth{
-			Password: c.String("auth.password"),
-			Username: c.String("auth.username"),
-		},
+		URLs:        c.StringSlice("urls"),
+		SkipVerify:  c.Bool("skip_verify"),
+		Debug:       c.Bool("debug"),
 		Method:      c.String("method"),
 		Template:    c.String("template"),
 		ContentType: c.String("content_type"),
+	}
+
+	log.WithFields(log.Fields{
+		"auth":    c.String("auth"),
+		"headers": c.String("headers"),
+	}).Debug()
+
+	if c.String("auth") != "" {
+		if err := json.Unmarshal([]byte(c.String("auth")), &vargs.Auth); err != nil {
+			return err
+		}
+	}
+
+	if c.String("headers") != "" {
+		if err := json.Unmarshal([]byte(c.String("headers")), &vargs.Headers); err != nil {
+			return err
+		}
 	}
 
 	if vargs.Method == "" {
@@ -221,15 +254,19 @@ func run(c *cli.Context) error {
 	if vargs.Template == "" {
 		buf, err := json.Marshal(&payload)
 		if err != nil {
-			return fmt.Errorf("Error: Failed to encode JSON payload. %s\n", err)
+			return fmt.Errorf("failed to encode JSON payload. %s", err)
 		}
 		b = buf
 	} else {
 		msg, err := template.RenderTrim(vargs.Template, &payload)
 		if err != nil {
-			return fmt.Errorf("Error: Failed to execute the content template. %s\n", err)
+			return fmt.Errorf("failed to execute the content template. %s", err)
 		}
 		b = []byte(msg)
+	}
+
+	if vargs.Debug {
+		log.SetLevel(log.DebugLevel)
 	}
 
 	// build and execute a request for each url.
@@ -241,7 +278,7 @@ func run(c *cli.Context) error {
 		uri, err := url.Parse(rawurl)
 
 		if err != nil {
-			return fmt.Errorf("Error: Failed to parse the hook URL. %s\n", err)
+			return fmt.Errorf("error: Failed to parse the hook URL. %s", err)
 		}
 
 		r := bytes.NewReader(b)
@@ -249,7 +286,7 @@ func run(c *cli.Context) error {
 		req, err := http.NewRequest(vargs.Method, uri.String(), r)
 
 		if err != nil {
-			return fmt.Errorf("Error: Failed to create the HTTP request. %s\n", err)
+			return fmt.Errorf("error: Failed to create the HTTP request. %s", err)
 		}
 
 		req.Header.Set("Content-Type", vargs.ContentType)
@@ -273,7 +310,7 @@ func run(c *cli.Context) error {
 		resp, err := client.Do(req)
 
 		if err != nil {
-			return fmt.Errorf("Error: Failed to execute the HTTP request. %s\n", err)
+			return fmt.Errorf("failed to execute the HTTP request. %s", err)
 		}
 
 		defer resp.Body.Close()
@@ -282,11 +319,11 @@ func run(c *cli.Context) error {
 			body, err := ioutil.ReadAll(resp.Body)
 
 			if err != nil {
-				fmt.Printf("Error: Failed to read the HTTP response body. %s\n", err)
+				log.Infof("failed to read the HTTP response body. %s", err)
 			}
 
 			if vargs.Debug {
-				fmt.Printf(
+				log.Infof(
 					debugRespFormat,
 					i+1,
 					req.URL,
@@ -297,7 +334,7 @@ func run(c *cli.Context) error {
 					string(body),
 				)
 			} else {
-				fmt.Printf(
+				log.Infof(
 					respFormat,
 					i+1,
 					req.URL,
