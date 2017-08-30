@@ -1,4 +1,4 @@
-package template
+package main
 
 import (
 	"fmt"
@@ -64,6 +64,7 @@ var funcs = map[string]interface{}{
 	"failure":        isFailure,
 	"truncate":       truncate,
 	"urlencode":      urlencode,
+	"since":          since,
 }
 
 func truncate(s string, len int) string {
@@ -82,11 +83,11 @@ func uppercaseFirst(s string) string {
 	return s
 }
 
-func toDuration(started, finished int64) string {
+func toDuration(started, finished float64) string {
 	return fmt.Sprintln(time.Duration(finished-started) * time.Second)
 }
 
-func toDatetime(timestamp int64, layout, zone string) string {
+func toDatetime(timestamp float64, layout, zone string) string {
 	if len(zone) == 0 {
 		return time.Unix(int64(timestamp), 0).Format(layout)
 	}
@@ -125,4 +126,12 @@ func isFailure(conditional bool, options *raymond.Options) string {
 
 func urlencode(options *raymond.Options) string {
 	return url.QueryEscape(options.Fn())
+}
+
+func since(start int64) string {
+	// NOTE: not using `time.Since()` because the fractional second component
+	// will give us something like "40m12.917523438s" vs "40m12s". We lose
+	// some precision, but the format is much more readable.
+	now := time.Unix(time.Now().Unix(), 0)
+	return fmt.Sprintln(now.Sub(time.Unix(start, 0)))
 }

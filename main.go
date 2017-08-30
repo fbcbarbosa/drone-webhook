@@ -1,29 +1,13 @@
 package main
 
 import (
-	"bytes"
-	"crypto/tls"
-	"fmt"
-	"io/ioutil"
-	"net/http"
-	"net/url"
-	"os"
-
 	"encoding/json"
+	"fmt"
+	"os"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/drone/drone-go/drone"
-	"github.com/drone/drone-go/template"
 	"github.com/urfave/cli"
-)
-
-const (
-	respFormat      = "Webhook %d\n  URL: %s\n  RESPONSE STATUS: %s\n  RESPONSE BODY: %s\n"
-	debugRespFormat = "Webhook %d\n  URL: %s\n  METHOD: %s\n  HEADERS: %s\n  REQUEST BODY: %s\n  RESPONSE STATUS: %s\n  RESPONSE BODY: %s\n"
-)
-
-var (
-	buildCommit string
 )
 
 func main() {
@@ -74,6 +58,11 @@ func main() {
 			Name:   "template",
 			Usage:  "webhook template",
 			EnvVar: "PLUGIN_TEMPLATE",
+		},
+		cli.StringFlag{
+			Name:   "repo",
+			Usage:  "repo",
+			EnvVar: "DRONE_REPO",
 		},
 		cli.StringFlag{
 			Name:   "repo.owner",
@@ -187,10 +176,9 @@ func main() {
 }
 
 func run(c *cli.Context) error {
-	log.Info(c.Generic("headers"))
 
-	payload := &drone.Payload{
-		Repo: &drone.Repo{
+	payload := Payload{
+		Repo: drone.Repo{
 			Owner:  c.String("repo.owner"),
 			Name:   c.String("repo.name"),
 			Link:   c.String("repo.link"),
@@ -198,7 +186,7 @@ func run(c *cli.Context) error {
 			Branch: c.String("repo.branch"),
 			Clone:  c.String("repo.clone"),
 		},
-		Build: &drone.Build{
+		Build: drone.Build{
 			Number:   c.Int("build.number"),
 			Event:    c.String("build.event"),
 			Status:   c.String("build.status"),
@@ -216,133 +204,27 @@ func run(c *cli.Context) error {
 		},
 	}
 
-	vargs := Params{
+	plugin := Plugin{
 		URLs:        c.StringSlice("urls"),
 		SkipVerify:  c.Bool("skip_verify"),
 		Debug:       c.Bool("debug"),
 		Method:      c.String("method"),
 		Template:    c.String("template"),
 		ContentType: c.String("content_type"),
+		Payload:     payload,
 	}
 
-	log.WithFields(log.Fields{
-		"auth":    c.String("auth"),
-		"headers": c.String("headers"),
-	}).Debug()
-
 	if c.String("auth") != "" {
-		if err := json.Unmarshal([]byte(c.String("auth")), &vargs.Auth); err != nil {
+		if err := json.Unmarshal([]byte(c.String("auth")), &plugin.Auth); err != nil {
 			return err
 		}
 	}
 
 	if c.String("headers") != "" {
-		if err := json.Unmarshal([]byte(c.String("headers")), &vargs.Headers); err != nil {
+		if err := json.Unmarshal([]byte(c.String("headers")), &plugin.Headers); err != nil {
 			return err
 		}
 	}
 
-	if vargs.Method == "" {
-		vargs.Method = "POST"
-	}
-
-	if vargs.ContentType == "" {
-		vargs.ContentType = "application/json"
-	}
-
-	var b []byte
-	if vargs.Template == "" {
-		buf, err := json.Marshal(&payload)
-		if err != nil {
-			return fmt.Errorf("failed to encode JSON payload. %s", err)
-		}
-		b = buf
-	} else {
-		msg, err := template.RenderTrim(vargs.Template, &payload)
-		if err != nil {
-			return fmt.Errorf("failed to execute the content template. %s", err)
-		}
-		b = []byte(msg)
-	}
-
-	if vargs.Debug {
-		log.SetLevel(log.DebugLevel)
-	}
-
-	// build and execute a request for each url.
-	// all auth, headers, method, template (payload),
-	// and content_type values will be applied to
-	// every webhook request.
-
-	for i, rawurl := range vargs.URLs {
-		uri, err := url.Parse(rawurl)
-
-		if err != nil {
-			return fmt.Errorf("error: Failed to parse the hook URL. %s", err)
-		}
-
-		r := bytes.NewReader(b)
-
-		req, err := http.NewRequest(vargs.Method, uri.String(), r)
-
-		if err != nil {
-			return fmt.Errorf("error: Failed to create the HTTP request. %s", err)
-		}
-
-		req.Header.Set("Content-Type", vargs.ContentType)
-
-		for key, value := range vargs.Headers {
-			req.Header.Set(key, value)
-		}
-
-		if vargs.Auth.Username != "" {
-			req.SetBasicAuth(vargs.Auth.Username, vargs.Auth.Password)
-		}
-
-		client := http.DefaultClient
-		if vargs.SkipVerify {
-			client = &http.Client{
-				Transport: &http.Transport{
-					TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-				},
-			}
-		}
-		resp, err := client.Do(req)
-
-		if err != nil {
-			return fmt.Errorf("failed to execute the HTTP request. %s", err)
-		}
-
-		defer resp.Body.Close()
-
-		if vargs.Debug || resp.StatusCode >= http.StatusBadRequest {
-			body, err := ioutil.ReadAll(resp.Body)
-
-			if err != nil {
-				log.Infof("failed to read the HTTP response body. %s", err)
-			}
-
-			if vargs.Debug {
-				log.Infof(
-					debugRespFormat,
-					i+1,
-					req.URL,
-					req.Method,
-					req.Header,
-					string(b),
-					resp.Status,
-					string(body),
-				)
-			} else {
-				log.Infof(
-					respFormat,
-					i+1,
-					req.URL,
-					resp.Status,
-					string(body),
-				)
-			}
-		}
-	}
-	return nil
+	return plugin.Exec()
 }
